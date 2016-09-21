@@ -10,7 +10,8 @@ var productSchema = new mongoose.Schema({
   ProductName: String,
   ProductPrices:[],
   ProductSex: String,
-  ProductLabel: String
+  ProductLabel: String,
+  ProductDescription:String
 },{_id:false});
 var Product = mongoose.model('Product',productSchema);
 
@@ -77,29 +78,31 @@ function getLinkProduct(arrCategory,callback){
 
 function crawlerProduct(arrProduct,callback){
   async.each(arrProduct,function(productLink,cb){
-    request(productLink,function(err,res,body){
-      if(err) return cb(err);
+    request({url:productLink,timeout:1500000 },function(err,res,body){
+      if(err) {console.log(productLink+'------>'+'This link is error!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'+err);return cb(null);}
       var $=cheerio.load(body);
       var product = new Product();
       product.ProductName = $('td.img-wrapper div.title h1').text();
+      product.ProductName = product.ProductName.indexOf(' ')==0?product.ProductName.substring(1):product.ProductName;
       product.ProductSex= $('td.desc-wrapper div.title img').attr('id');
       product.ProductLabel= $('td.desc-wrapper div.clear strong').text();
+      product.ProductDescription = $('td.desc-wrapper div.desc').text();
       product._id = product.ProductName+'_'+product.ProductSex;
       var prices =[];
       var priceSelector = $('tbody tr[itemprop="offers"]');
       priceSelector.each(function(){
-        var price= parseInt($(this).children('td.g').children('span.price').text().replace('.',''));
-        var priceTGNH= parseInt($(this).children('td.hidden-xs').first().text().replace('.',''));
+        var priceTGNH= parseInt($(this).children('td.g').children('span.price').text().replace(/\./g,''));
+        var price= parseInt($(this).children('td.hidden-xs').first().text().replace(/\./g,''));
         var volumn= $(this).children('td').first().text();
         var priceJson = {Volumn:volumn,Price:price,PriceTGNH:priceTGNH};
         prices.push(priceJson);
       });
       product.ProductPrices = prices;
       product.save(function(err){
-        if(err) console.log(err);
-        console.log('Added-----------------------------------------------');
+        if(err) console.log('Duplicate----------------------------------------');
+        else console.log('Added-----------------------------------------------');
+        return cb(null);
       })
-      cb();
     })
   },function(err,result){
     if(err) return callback(err);
